@@ -48,6 +48,31 @@ def index():
     return render_template("index.html", error=None)
 
 
+def _handle_url_import(url: str):
+    """Free schema.org-only pass; complete -> publish immediately, otherwise
+    let the user pick AI extraction vs. manual selection."""
+    try:
+        recipe = extract_schema_org(url)
+    except FetchError as exc:
+        return render_template("index.html", error=f"Couldn't fetch that page: {exc}")
+
+    if is_recipe_complete(recipe):
+        return _publish_and_render(recipe)
+
+    return render_template("choose_method.html", url=url)
+
+
+@app.get("/import")
+def do_import_get():
+    """Same as POST /import's URL path, reachable by plain navigation (e.g.
+    an iOS Shortcut in the Share Sheet opening /import?url=<shared link>,
+    since Shortcuts' "Open URL" action is much simpler than a POST)."""
+    url = (request.args.get("url") or "").strip()
+    if not url:
+        return render_template("index.html", error="Missing URL.")
+    return _handle_url_import(url)
+
+
 @app.post("/import")
 def do_import():
     """Home page entry point. URLs get the free schema.org-only pass first;
@@ -56,15 +81,7 @@ def do_import():
     pdf_file = request.files.get("pdf")
 
     if url:
-        try:
-            recipe = extract_schema_org(url)
-        except FetchError as exc:
-            return render_template("index.html", error=f"Couldn't fetch that page: {exc}")
-
-        if is_recipe_complete(recipe):
-            return _publish_and_render(recipe)
-
-        return render_template("choose_method.html", url=url)
+        return _handle_url_import(url)
 
     if pdf_file and pdf_file.filename:
         try:
