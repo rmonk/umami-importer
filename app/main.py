@@ -15,8 +15,7 @@ from flask import Flask, render_template, request
 
 from extract_pdf import extract_from_pdf
 from extract_url import extract_from_url
-from publish_recipe import PublishError, publish_recipe_html
-from render_recipe_html import render_recipe_html
+from publish_recipe import PublishError, publish
 
 app = Flask(__name__)
 
@@ -56,9 +55,8 @@ def do_import():
             error="Couldn't find a complete recipe (missing title, ingredients, or instructions).",
         )
 
-    html = render_recipe_html(recipe)
     try:
-        relay_url = publish_recipe_html(html)
+        relay_url = publish(recipe)
     except PublishError as exc:
         return render_template("index.html", error=f"Couldn't publish the recipe page: {exc}")
 

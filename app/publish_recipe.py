@@ -1,58 +1,185 @@
-"""Publish a rendered recipe page to the umami-recipe-relay GitHub Pages repo
-via the GitHub Contents API (not git/SSH), so this works from inside a
-container with just a token -- no git binary, no SSH keys, no local clone.
+"""Publish recipe pages (and their photo, and a tracking index) to the
+umami-recipe-relay GitHub Pages repo via the GitHub Contents API (not
+git/SSH), so this works from inside a container with just a token.
 
-One-time setup (already done for this repo): a public GitHub repo with Pages
-enabled serving from the `main` branch root. See reference/umami_api.md.
+Recipe pages are permanent: umami stores importUrl pointing back here, so a
+recipe's "view source" link in umami should keep working. A manifest.json +
+generated index.html at the repo root give the user an easy, stable (but
+unlisted -- not linked from any individual recipe page) way to find
+everything that's been published.
 """
 
 from __future__ import annotations
 
 import base64
+import html as html_module
+import json
+import mimetypes
 import os
 import secrets
+from datetime import datetime, timezone
 
 import requests
 
+from render_recipe_html import render_recipe_html
+
 DEFAULT_REPO = "rmonk/umami-recipe-relay"
 DEFAULT_PAGES_BASE = "https://rmonk.github.io/umami-recipe-relay"
+MANIFEST_PATH = "manifest.json"
+INDEX_PATH = "index.html"
 
 
 class PublishError(RuntimeError):
     pass
 
 
-def _github_token() -> str:
+def _repo() -> str:
+    return os.environ.get("GITHUB_REPO", DEFAULT_REPO)
+
+
+def _pages_base() -> str:
+    return os.environ.get("GITHUB_PAGES_BASE", DEFAULT_PAGES_BASE)
+
+
+def _headers() -> dict:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise PublishError(
-            "GITHUB_TOKEN is not set. It needs `repo` scope on the relay repo "
-            f"({os.environ.get('GITHUB_REPO', DEFAULT_REPO)})."
+            f"GITHUB_TOKEN is not set. It needs `repo` scope on {_repo()}."
         )
-    return token
+    return {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
 
 
-def publish_recipe_html(html: str, slug: str | None = None) -> str:
-    """Commit `html` to recipes/<slug>.html on the relay repo's default
-    branch and return its public GitHub Pages URL."""
-    repo = os.environ.get("GITHUB_REPO", DEFAULT_REPO)
-    pages_base = os.environ.get("GITHUB_PAGES_BASE", DEFAULT_PAGES_BASE)
-    slug = slug or secrets.token_urlsafe(12).replace("_", "").replace("-", "")
-    path = f"recipes/{slug}.html"
+def _get_file(path: str) -> tuple[bytes | None, str | None]:
+    resp = requests.get(
+        f"https://api.github.com/repos/{_repo()}/contents/{path}",
+        headers=_headers(),
+        timeout=30,
+    )
+    if resp.status_code == 404:
+        return None, None
+    if not resp.ok:
+        raise PublishError(f"GitHub read failed for {path} ({resp.status_code}): {resp.text}")
+    body = resp.json()
+    return base64.b64decode(body["content"]), body["sha"]
 
+
+def _put_file(path: str, content: bytes, message: str, sha: str | None = None) -> None:
+    payload = {"message": message, "content": base64.b64encode(content).decode("ascii")}
+    if sha:
+        payload["sha"] = sha
     resp = requests.put(
-        f"https://api.github.com/repos/{repo}/contents/{path}",
-        headers={
-            "Authorization": f"Bearer {_github_token()}",
-            "Accept": "application/vnd.github+json",
-        },
-        json={
-            "message": f"Add recipe page {slug}",
-            "content": base64.b64encode(html.encode("utf-8")).decode("ascii"),
-        },
+        f"https://api.github.com/repos/{_repo()}/contents/{path}",
+        headers=_headers(),
+        json=payload,
         timeout=30,
     )
     if not resp.ok:
-        raise PublishError(f"GitHub publish failed ({resp.status_code}): {resp.text}")
+        raise PublishError(f"GitHub write failed for {path} ({resp.status_code}): {resp.text}")
 
-    return f"{pages_base}/{path}"
+
+def new_slug() -> str:
+    return secrets.token_urlsafe(12).replace("_", "").replace("-", "")
+
+
+def _rehost_image(image_url: str, slug: str) -> str | None:
+    """Download the recipe's hero image and re-host it in the relay repo, so
+    umami's client-side preview (which needs CORS to load it) isn't at the
+    mercy of the source site's CDN, which usually sends no CORS headers at
+    all. Returns None (rather than raising) if this fails -- a missing photo
+    shouldn't block the rest of the import."""
+    try:
+        resp = requests.get(image_url, timeout=30)
+        resp.raise_for_status()
+        content_type = resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+        ext = mimetypes.guess_extension(content_type) or ".jpg"
+        path = f"recipes/{slug}{ext}"
+        _put_file(path, resp.content, f"Add photo for {slug}")
+        return f"{_pages_base()}/{path}"
+    except Exception:
+        return None
+
+
+def _update_index(slug: str, recipe: dict) -> None:
+    """Best-effort: append this recipe to manifest.json and regenerate
+    index.html. Never raises -- the recipe page itself is already published
+    and working even if this fails."""
+    try:
+        entries_raw, sha = _get_file(MANIFEST_PATH)
+        entries = json.loads(entries_raw) if entries_raw else []
+        entries.append(
+            {
+                "slug": slug,
+                "name": recipe.get("name") or "Untitled recipe",
+                "source_url": recipe.get("source_url"),
+                "published_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        _put_file(
+            MANIFEST_PATH,
+            json.dumps(entries, indent=2).encode("utf-8"),
+            f"Track recipe {slug}",
+            sha=sha,
+        )
+        _, index_sha = _get_file(INDEX_PATH)
+        _put_file(
+            INDEX_PATH,
+            _render_index_html(entries).encode("utf-8"),
+            f"Update index for {slug}",
+            sha=index_sha,
+        )
+    except Exception:
+        pass
+
+
+def _render_index_html(entries: list[dict]) -> str:
+    rows = []
+    for entry in sorted(entries, key=lambda e: e["published_at"], reverse=True):
+        name = html_module.escape(entry["name"])
+        date = entry["published_at"][:10]
+        recipe_link = f'<a href="recipes/{entry["slug"]}.html">{name}</a>'
+        source = entry.get("source_url")
+        source_link = f' &middot; <a href="{html_module.escape(source)}">source</a>' if source else ""
+        rows.append(f"<li>{date} &mdash; {recipe_link}{source_link}</li>")
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>umami-recipe-relay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {{ font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }}
+li {{ margin-bottom: 0.4rem; }}
+</style>
+</head>
+<body>
+<h1>Recipe relay pages</h1>
+<p>These pages exist so umami.recipes can import recipes cleanly. Not linked
+from anywhere else -- keep this URL to yourself.</p>
+<ul>
+{chr(10).join(rows)}
+</ul>
+</body>
+</html>
+"""
+
+
+def publish(recipe: dict) -> str:
+    """Render, publish, and index a normalized recipe dict. Returns its
+    public relay page URL."""
+    slug = new_slug()
+
+    if recipe.get("image_url"):
+        hosted = _rehost_image(recipe["image_url"], slug)
+        if hosted:
+            recipe = {**recipe, "image_url": hosted}
+
+    html = render_recipe_html(recipe)
+    path = f"recipes/{slug}.html"
+    _put_file(path, html.encode("utf-8"), f"Add recipe {slug}")
+    relay_url = f"{_pages_base()}/{path}"
+
+    _update_index(slug, recipe)
+
+    return relay_url
