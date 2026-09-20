@@ -12,9 +12,9 @@ reverse-engineering notes). Rather than write into umami's database
 directly, this tool:
 
 1. Extracts the recipe itself — schema.org/JSON-LD first, falling back to
-   Claude for pages without clean structured data (and for PDFs, which
-   never have it). Sites that block plain HTTP requests are retried with a
-   headless browser.
+   an LLM (Claude or Gemini, configurable) for pages without clean
+   structured data (and for PDFs, which never have it). Sites that block
+   plain HTTP requests are retried with a headless browser.
 2. Re-renders the recipe as a clean, minimal HTML page with well-formed
    schema.org markup.
 3. Publishes that page to a public GitHub Pages repo
@@ -30,7 +30,9 @@ directly, this tool:
 | `GITHUB_TOKEN` | yes | Token with `repo` scope on the relay repo, used via the GitHub Contents API to publish pages (no git/SSH needed). Locally, `gh auth token` works if you're logged in with the `gh` CLI. |
 | `GITHUB_REPO` | no | Defaults to `rmonk/umami-recipe-relay`. |
 | `GITHUB_PAGES_BASE` | no | Defaults to `https://rmonk.github.io/umami-recipe-relay`. |
-| `ANTHROPIC_API_KEY` | for the fallback path | Needed for pages without clean schema.org markup, and for all PDF imports. Without it, only sites with good structured data will work. |
+| `LLM_PROVIDER` | no | `anthropic` (default) or `gemini` — picks which LLM does the fallback extraction. |
+| `ANTHROPIC_API_KEY` | if `LLM_PROVIDER=anthropic` | Needed for pages without clean schema.org markup, and for all PDF imports. |
+| `GEMINI_API_KEY` | if `LLM_PROVIDER=gemini` | Same purpose, via Google Gemini instead of Claude. |
 
 ## Run locally
 

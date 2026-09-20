@@ -13,7 +13,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from claude_extract import structure_recipe_text
+from llm_extract import structure_recipe_text
 from fetch_html import fetch_html
 
 _DURATION_RE = re.compile(

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pdfplumber
 
-from claude_extract import structure_recipe_text
+from llm_extract import structure_recipe_text
 
 
 def extract_from_pdf(path: str) -> dict:
