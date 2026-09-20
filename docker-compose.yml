@@ -15,4 +15,11 @@ services:
       tsbridge.service.name: ${TSBRIDGE_SERVICE_NAME:-umami-importer}
       tsbridge.service.port: "8000"
       tsbridge.service.tags: ${TSBRIDGE_SERVICE_TAGS:-}
+      # Publishing a recipe (extraction + image re-host + GitHub commits +
+      # waiting for Pages to deploy) routinely takes 40-90s, well past
+      # tsbridge's 30s default write_timeout -- without this, tsbridge cuts
+      # the connection before the (successfully completing) response comes
+      # back, which looks like an infinite spinner that "eventually" times
+      # out even though the import went through.
+      tsbridge.service.write_timeout: "100s"
     restart: unless-stopped

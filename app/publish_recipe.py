@@ -180,11 +180,16 @@ from anywhere else -- keep this URL to yourself.</p>
 """
 
 
-def _wait_until_live(url: str, timeout: float = 60, interval: float = 2) -> bool:
+def _wait_until_live(url: str, timeout: float = 20, interval: float = 2) -> bool:
     """GitHub Pages takes a while (seconds to ~a minute) to deploy after a
     commit. Poll until the page is actually reachable so we never hand the
     user a link that 404s. Returns False (not an error) on timeout -- the
-    page will likely finish deploying moments later regardless."""
+    page will likely finish deploying moments later regardless.
+
+    Kept short on purpose: this runs inside one synchronous HTTP request, and
+    every second here adds to the odds of tripping a proxy's write timeout
+    (see docker-compose.yml's tsbridge.service.write_timeout) before the
+    -- otherwise successful -- response ever reaches the client."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
