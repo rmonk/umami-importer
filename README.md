@@ -84,11 +84,12 @@ received 404` (a known Podman limitation:
 `docker-compose.yml` references that image directly (`image:`, no `build:`
 key), so Arcane only ever needs to `docker pull` it.
 
-Note: GitHub Container Registry packages default to **private** even when
-the source repo is public. After the first Actions run publishes the image,
-go to the package's settings (github.com/users/rmonk/packages/container/umami-importer/settings)
-and set visibility to public — otherwise Arcane will need a GHCR-scoped
-credential (a PAT with `read:packages`) to pull it.
+Verified after the first Actions run: `ghcr.io/rmonk/umami-importer:latest`
+pulls anonymously with no credentials at all, so Arcane doesn't need a GHCR
+credential to pull it. (GHCR packages built from a public repo via the
+default `GITHUB_TOKEN` came out public automatically here — if a future push
+ever creates the package as private instead, its visibility can be changed
+under github.com/users/rmonk/packages/container/umami-importer/settings.)
 
 1. In Arcane: **Customization → Variables** — add `GITHUB_TOKEN`,
    `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY`, and optionally
