@@ -65,17 +65,31 @@ def _get_file(path: str) -> tuple[bytes | None, str | None]:
     return base64.b64decode(body["content"]), body["sha"]
 
 
-def _put_file(path: str, content: bytes, message: str, sha: str | None = None) -> None:
-    payload = {"message": message, "content": base64.b64encode(content).decode("ascii")}
-    if sha:
-        payload["sha"] = sha
-    resp = requests.put(
-        f"https://api.github.com/repos/{_repo()}/contents/{path}",
-        headers=_headers(),
-        json=payload,
-        timeout=30,
-    )
-    if not resp.ok:
+def _put_file(path: str, content: bytes, message: str, sha: str | None = None, _attempts: int = 4) -> None:
+    """The Contents API isn't atomic across concurrent requests -- it reads
+    the branch tip, builds a commit, then does a compare-and-swap on the ref.
+    Two overlapping publishes (gunicorn runs multiple workers) can race that
+    last step and get a 409 regardless of which files they're touching, not
+    just genuine sha conflicts on the same path. Retry: for a new file (no
+    sha) the same request is safe to resend; for an update, refresh the
+    file's current sha first."""
+    for attempt in range(_attempts):
+        payload = {"message": message, "content": base64.b64encode(content).decode("ascii")}
+        if sha:
+            payload["sha"] = sha
+        resp = requests.put(
+            f"https://api.github.com/repos/{_repo()}/contents/{path}",
+            headers=_headers(),
+            json=payload,
+            timeout=30,
+        )
+        if resp.ok:
+            return
+        if resp.status_code == 409 and attempt < _attempts - 1:
+            time.sleep(0.5 * (2**attempt))
+            if sha:
+                _, sha = _get_file(path)
+            continue
         raise PublishError(f"GitHub write failed for {path} ({resp.status_code}): {resp.text}")
 
 
