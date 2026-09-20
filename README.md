@@ -69,7 +69,7 @@ through to umami.recipes to finish the import.
 
 ## Deploying via Arcane (Git Sync)
 
-This repo lives at `github.com/rmonk/umami-importer` (private).
+This repo lives at `github.com/rmonk/umami-importer` (public).
 `docker-compose.yml` at the repo root builds from the `Dockerfile` and reads
 every secret as a `${VAR}` placeholder — none of them live in this repo.
 
@@ -79,9 +79,9 @@ every secret as a `${VAR}` placeholder — none of them live in this repo.
    want non-default values. These are stored encrypted in Arcane and written
    to `.env.global` at deploy time — never committed here.
 2. In Arcane: **Customization → Git Repositories** — add
-   `https://github.com/rmonk/umami-importer` with a GitHub Personal Access
-   Token (repo must be private-readable) or an SSH deploy key, since the
-   repo is private.
+   `https://github.com/rmonk/umami-importer`. Being public, no
+   authentication is required for Arcane to pull it (a PAT or SSH key only
+   matters if you ever use Push mode, or later make the repo private).
 3. Create a **Git Sync** in **Pull** mode against that repository: branch
    `main`, Compose file path `docker-compose.yml` (repo root). Enable Auto
    Sync if you want it to redeploy on every push.
