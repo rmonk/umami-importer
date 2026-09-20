@@ -70,8 +70,25 @@ through to umami.recipes to finish the import.
 ## Deploying via Arcane (Git Sync)
 
 This repo lives at `github.com/rmonk/umami-importer` (public).
-`docker-compose.yml` at the repo root builds from the `Dockerfile` and reads
-every secret as a `${VAR}` placeholder — none of them live in this repo.
+`docker-compose.yml` at the repo root reads every secret as a `${VAR}`
+placeholder — none of them live in this repo.
+
+**The image is built by GitHub Actions, not by Arcane.** Arcane hosts
+running on Podman talk to it through Podman's Docker-compatible API, which
+doesn't implement the BuildKit gRPC session a `docker build` needs — trying
+to build there fails with `failed to dial gRPC: unable to upgrade to h2c,
+received 404` (a known Podman limitation:
+[containers/podman#17836](https://github.com/containers/podman/issues/17836)).
+`.github/workflows/publish.yml` builds and pushes the image to
+`ghcr.io/rmonk/umami-importer` on every push to `main`, and
+`docker-compose.yml` references that image directly (`image:`, no `build:`
+key), so Arcane only ever needs to `docker pull` it.
+
+Note: GitHub Container Registry packages default to **private** even when
+the source repo is public. After the first Actions run publishes the image,
+go to the package's settings (github.com/users/rmonk/packages/container/umami-importer/settings)
+and set visibility to public — otherwise Arcane will need a GHCR-scoped
+credential (a PAT with `read:packages`) to pull it.
 
 1. In Arcane: **Customization → Variables** — add `GITHUB_TOKEN`,
    `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY`, and optionally
@@ -84,4 +101,7 @@ every secret as a `${VAR}` placeholder — none of them live in this repo.
    matters if you ever use Push mode, or later make the repo private).
 3. Create a **Git Sync** in **Pull** mode against that repository: branch
    `main`, Compose file path `docker-compose.yml` (repo root). Enable Auto
-   Sync if you want it to redeploy on every push.
+   Sync, and enable the post-sync image pull option, so a new push both
+   updates the compose file (rarely) and pulls the freshly-published image
+   (on every real code change) — a bare Git Sync without that option only
+   notices file changes, not new image content behind the same tag.

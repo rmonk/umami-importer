@@ -1,6 +1,6 @@
 services:
   umami-recipe-importer:
-    build: .
+    image: ghcr.io/rmonk/umami-importer:latest
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
