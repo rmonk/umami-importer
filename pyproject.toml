@@ -1,0 +1,15 @@
+[project]
+name = "umami-recipe-importer"
+version = "0.1.0"
+description = "Extracts recipes from URLs/PDFs and republishes them for clean import into umami.recipes"
+requires-python = ">=3.14"
+dependencies = [
+    "anthropic>=1.6.0",
+    "beautifulsoup4>=4.15.0",
+    "flask>=3.1.3",
+    "gunicorn>=26.2.0",
+    "pdfplumber>=0.11.10",
+    "pillow>=12.3.0",
+    "playwright>=1.63.0",
+    "requests>=2.34.2",
+]
