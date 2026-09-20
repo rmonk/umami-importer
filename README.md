@@ -69,25 +69,19 @@ through to umami.recipes to finish the import.
 
 ## Deploying via Arcane (Git Sync)
 
+This repo lives at `github.com/rmonk/umami-importer` (private).
 `docker-compose.yml` at the repo root builds from the `Dockerfile` and reads
 every secret as a `${VAR}` placeholder — none of them live in this repo.
 
-1. Push this repo to a git host Arcane can reach (see "Setting up the
-   remote" below if you haven't yet).
-2. In Arcane: **Customization → Variables** — add `GITHUB_TOKEN`,
+1. In Arcane: **Customization → Variables** — add `GITHUB_TOKEN`,
    `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY`, and optionally
    `GITHUB_REPO` / `GITHUB_PAGES_BASE` / `LLM_PROVIDER` / `HOST_PORT` if you
    want non-default values. These are stored encrypted in Arcane and written
    to `.env.global` at deploy time — never committed here.
-3. In Arcane: **Customization → Git Repositories** — add this repo's URL
-   with either a Personal Access Token (HTTPS) or an SSH key.
-4. Create a **Git Sync** in **Pull** mode against that repository: pick the
-   branch, and set the Compose file path to `docker-compose.yml` (repo
-   root). Enable Auto Sync if you want it to redeploy on every push.
-
-### Setting up the remote
-
-This repo doesn't have a git remote yet — it only needs to exist on
-whichever host you use with Arcane (GitHub, GitLab, a self-hosted Git
-server, etc.). No secrets live in the repo, so there's no strict need for it
-to be private, but there's no reason for it to be public either.
+2. In Arcane: **Customization → Git Repositories** — add
+   `https://github.com/rmonk/umami-importer` with a GitHub Personal Access
+   Token (repo must be private-readable) or an SSH deploy key, since the
+   repo is private.
+3. Create a **Git Sync** in **Pull** mode against that repository: branch
+   `main`, Compose file path `docker-compose.yml` (repo root). Enable Auto
+   Sync if you want it to redeploy on every push.
