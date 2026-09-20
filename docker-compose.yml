@@ -1,0 +1,13 @@
+services:
+  umami-recipe-importer:
+    build: .
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO: ${GITHUB_REPO:-rmonk/umami-recipe-relay}
+      GITHUB_PAGES_BASE: ${GITHUB_PAGES_BASE:-https://rmonk.github.io/umami-recipe-relay}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    restart: unless-stopped
