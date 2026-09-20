@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Select recipe sections</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  .topbar { padding: 0.75rem 1rem; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .topbar a { white-space: nowrap; }
+  .topbar .url { color: #555; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layout { display: flex; height: calc(100vh - 48px); }
+  .pane { width: 55%; overflow-y: auto; padding: 1rem; border-right: 1px solid #ddd; }
+  .pane, .pane * { max-width: 100%; }
+  .pane li, .pane p, .pane h1, .pane h2, .pane h3, .pane h4, .pane span, .pane div, .pane td {
+    cursor: pointer;
+  }
+  .pane li:hover, .pane p:hover, .pane h1:hover, .pane h2:hover, .pane h3:hover,
+  .pane h4:hover, .pane td:hover {
+    outline: 2px solid #90caf9;
+    background: #e3f2fd;
+  }
+  .pane ul:hover, .pane ol:hover { outline: 2px dashed #90caf9; }
+  .sidebar { width: 45%; overflow-y: auto; padding: 1rem; }
+  .sidebar label { display: block; font-weight: 600; margin: 0.75rem 0 0.25rem; font-size: 0.9rem; }
+  .sidebar input[type=text], .sidebar textarea { width: 100%; padding: 0.4rem; font-family: inherit; font-size: 0.95rem; }
+  .sidebar textarea { min-height: 5rem; }
+  .hint { color: #777; font-size: 0.8rem; margin: 0.75rem 0; }
+  .publish-btn { margin-top: 1rem; padding: 0.7rem 1.2rem; font-size: 1rem; background: #2e7d32; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/">&larr; Start over</a>
+  <span class="url">{{ url }}</span>
+</div>
+<div class="layout">
+  <div class="pane" id="content-pane">
+    {{ sanitized_html | safe }}
+  </div>
+  <div class="sidebar">
+    <p class="hint">Click text on the left to insert it into whichever field
+    below is focused. Click a bulleted/numbered list to add every item at
+    once. Click an image to set the photo. Everything here is editable by
+    hand too.</p>
+
+    <form id="recipe-form" method="post" action="/import/manual">
+      <input type="hidden" name="recipe" id="recipe-json">
+
+      <label>Title</label>
+      <input type="text" id="f-name" value="{{ prefill.name }}">
+
+      <label>Servings</label>
+      <input type="text" id="f-servings" value="{{ prefill.servings }}">
+
+      <label>Active time</label>
+      <input type="text" id="f-active" value="{{ prefill.active_time }}">
+
+      <label>Total time</label>
+      <input type="text" id="f-total" value="{{ prefill.total_time }}">
+
+      <label>Photo URL</label>
+      <input type="text" id="f-photo" value="{{ prefill.image_url or '' }}">
+
+      <label>Ingredients (one per line)</label>
+      <textarea id="f-ingredients">{{ prefill.ingredients | join('\n') }}</textarea>
+
+      <label>Directions (one per line)</label>
+      <textarea id="f-directions">{{ prefill.directions | join('\n') }}</textarea>
+
+      <label>Notes (one per line)</label>
+      <textarea id="f-notes">{{ prefill.notes | join('\n') }}</textarea>
+
+      <button type="submit" class="publish-btn">Publish this recipe</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const SOURCE_URL = {{ url | tojson }};
+  const pane = document.getElementById('content-pane');
+  const photoField = document.getElementById('f-photo');
+  const fields = ['f-name', 'f-servings', 'f-active', 'f-total', 'f-ingredients', 'f-directions', 'f-notes']
+    .map(id => document.getElementById(id));
+
+  let lastFocused = document.getElementById('f-ingredients');
+  fields.forEach(el => el.addEventListener('focus', () => { lastFocused = el; }));
+
+  function insertLines(lines) {
+    const text = lines.join('\n');
+    if (lastFocused.tagName === 'TEXTAREA') {
+      const sep = lastFocused.value && !lastFocused.value.endsWith('\n') ? '\n' : '';
+      lastFocused.value += sep + text;
+    } else {
+      lastFocused.value = lines[0] || '';
+    }
+  }
+
+  pane.addEventListener('click', function(e) {
+    const img = e.target.closest('img');
+    if (img) {
+      photoField.value = img.src;
+      e.preventDefault();
+      return;
+    }
+    const li = e.target.closest('li');
+    if (li) {
+      insertLines([li.innerText.trim()]);
+      e.preventDefault();
+      return;
+    }
+    if (e.target.tagName === 'UL' || e.target.tagName === 'OL') {
+      const items = Array.from(e.target.children)
+        .filter(c => c.tagName === 'LI')
+        .map(c => c.innerText.trim())
+        .filter(Boolean);
+      if (items.length) insertLines(items);
+      e.preventDefault();
+      return;
+    }
+    const block = e.target.closest('h1,h2,h3,h4,h5,h6,p,td,th,span,div');
+    if (block) {
+      const text = (block.innerText || block.textContent || '').trim();
+      if (text) insertLines([text]);
+    }
+    e.preventDefault();
+  });
+
+  document.getElementById('recipe-form').addEventListener('submit', function() {
+    const splitLines = (v) => v.split('\n').map(s => s.trim()).filter(Boolean);
+    document.getElementById('recipe-json').value = JSON.stringify({
+      name: document.getElementById('f-name').value.trim(),
+      servings: document.getElementById('f-servings').value.trim(),
+      active_time: document.getElementById('f-active').value.trim(),
+      total_time: document.getElementById('f-total').value.trim(),
+      ingredients: splitLines(document.getElementById('f-ingredients').value),
+      directions: splitLines(document.getElementById('f-directions').value),
+      notes: splitLines(document.getElementById('f-notes').value),
+      source_url: SOURCE_URL,
+      image_url: photoField.value.trim(),
+    });
+  });
+})();
+</script>
+</body>
+</html>

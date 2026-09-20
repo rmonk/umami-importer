@@ -127,25 +127,51 @@ def _og_image(soup: BeautifulSoup) -> str | None:
     return tag.get("content") if tag else None
 
 
-def extract_from_url(url: str) -> dict:
+def is_recipe_complete(recipe: dict) -> bool:
+    return _is_complete(recipe)
+
+
+def extract_schema_org(url: str) -> dict:
+    """Free, LLM-free extraction: fetch the page and parse schema.org/JSON-LD
+    only. May return an incomplete recipe (missing name/ingredients/
+    directions) when the page has no or partial structured data -- callers
+    decide whether to fall back to an LLM or to manual entry."""
     html = fetch_html(url)
     soup = BeautifulSoup(html, "html.parser")
 
     jsonld = _find_recipe_jsonld(soup)
-    recipe = _jsonld_to_recipe(jsonld, url) if jsonld else None
-
-    if recipe is None or not _is_complete(recipe):
-        text = _page_text(soup)
-        structured = structure_recipe_text(text, source_url=url)
-        if recipe is None:
-            recipe = structured
-        else:
-            # keep whatever schema.org gave us; fill gaps from Claude
-            for key in ("name", "servings", "active_time", "total_time", "ingredients", "directions", "notes"):
-                if not recipe.get(key):
-                    recipe[key] = structured.get(key)
+    recipe = _jsonld_to_recipe(jsonld, url) if jsonld else {
+        "name": "",
+        "servings": "",
+        "active_time": "",
+        "total_time": "",
+        "ingredients": [],
+        "directions": [],
+        "notes": [],
+        "source_url": url,
+        "image_url": None,
+    }
 
     if not recipe.get("image_url"):
         recipe["image_url"] = _og_image(soup)
+
+    return recipe
+
+
+def extract_from_url(url: str) -> dict:
+    """Schema.org first; falls back to an LLM (see llm_extract.py) when
+    schema.org is missing or incomplete."""
+    recipe = extract_schema_org(url)
+
+    if not _is_complete(recipe):
+        html = fetch_html(url)
+        soup = BeautifulSoup(html, "html.parser")
+        text = _page_text(soup)
+        structured = structure_recipe_text(text, source_url=url)
+        for key in ("name", "servings", "active_time", "total_time", "ingredients", "directions", "notes"):
+            if not recipe.get(key):
+                recipe[key] = structured.get(key)
+        if not recipe.get("image_url"):
+            recipe["image_url"] = _og_image(soup)
 
     return recipe

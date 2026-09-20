@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Choose an extraction method</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 560px; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+  .option { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .option h2 { margin-top: 0; font-size: 1.1rem; }
+  .url { color: #555; word-break: break-all; font-size: 0.9rem; }
+  button, .button { padding: 0.6rem 1.2rem; font-size: 1rem; }
+</style>
+</head>
+<body>
+<p><a href="/">&larr; Start over</a></p>
+<h1>No structured recipe data found</h1>
+<p class="url">{{ url }}</p>
+<p>This page doesn't have clean schema.org recipe markup that we can parse
+for free. Pick how to proceed:</p>
+
+<div class="option">
+  <h2>Try AI extraction</h2>
+  <p>Sends the page text to an LLM to structure it. Uses API credits.</p>
+  <form method="post" action="/import/ai">
+    <input type="hidden" name="url" value="{{ url }}">
+    <button type="submit">Try AI extraction</button>
+  </form>
+</div>
+
+<div class="option">
+  <h2>Select sections manually</h2>
+  <p>Browse the page yourself and click the title, ingredients, and steps
+  into place. No API cost.</p>
+  <a class="button" href="/clip?url={{ url | urlencode }}">Select manually</a>
+</div>
+</body>
+</html>
