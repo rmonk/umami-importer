@@ -45,6 +45,18 @@ to set the photo. No LLM is ever called on this path.
 | `LLM_PROVIDER` | no | `anthropic` (default) or `gemini` — picks which LLM does the fallback extraction. |
 | `ANTHROPIC_API_KEY` | if `LLM_PROVIDER=anthropic` | Needed for pages without clean schema.org markup, and for all PDF imports. |
 | `GEMINI_API_KEY` | if `LLM_PROVIDER=gemini` | Same purpose, via Google Gemini instead of Claude. |
+| `TSBRIDGE_SERVICE_NAME` | no | Tailscale hostname [tsbridge](https://github.com/jtdowney/tsbridge) exposes this service as. Defaults to `umami-importer`. |
+| `TSBRIDGE_SERVICE_TAGS` | no | Comma-separated Tailscale tags (e.g. `tag:home,tag:media`) for the [tsbridge](https://github.com/jtdowney/tsbridge) label. Empty by default. |
+
+Compose does `${VAR}` substitution across the whole file, not just
+`environment:` — so the `labels:` block (for
+[tsbridge](https://github.com/jtdowney/tsbridge), which reads Docker labels
+to auto-expose services on a Tailnet) uses the exact same pattern as every
+secret above. Any tsbridge label whose value you don't want sitting in a
+public repo (hostname, tags, anything else from tsbridge's [full label
+reference](https://github.com/jtdowney/tsbridge/blob/main/docs/docker-labels.md))
+can be swapped for a `${SOME_VAR}` placeholder the same way and set via
+Arcane's Variables feature — nothing tsbridge-specific about the mechanism.
 
 ## Run locally
 

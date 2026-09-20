@@ -10,4 +10,9 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    labels:
+      tsbridge.enabled: "true"
+      tsbridge.service.name: ${TSBRIDGE_SERVICE_NAME:-umami-importer}
+      tsbridge.service.port: "8000"
+      tsbridge.service.tags: ${TSBRIDGE_SERVICE_TAGS:-}
     restart: unless-stopped
