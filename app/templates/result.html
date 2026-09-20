@@ -9,13 +9,21 @@
   .import-button { display: inline-block; margin: 1.5rem 0; padding: 0.8rem 1.4rem; font-size: 1.1rem;
                    background: #2e7d32; color: white; text-decoration: none; border-radius: 6px; }
   .relay-link { word-break: break-all; color: #555; font-size: 0.9rem; }
+  .deploying-note { background: #fff8e1; border: 1px solid #f0d878; border-radius: 6px; padding: 0.75rem 1rem; }
   h2 { margin-top: 2rem; }
+  img.hero { max-width: 100%; border-radius: 6px; margin: 1rem 0; }
 </style>
 </head>
 <body>
 <p><a href="/">&larr; Import another recipe</a></p>
 <h1>{{ recipe.name }}</h1>
 <p>{{ [recipe.servings, recipe.active_time, recipe.total_time] | select | join(' &middot; ') | safe }}</p>
+
+{% if recipe.image_url %}<img class="hero" src="{{ recipe.image_url }}" alt="{{ recipe.name }}">{% endif %}
+
+{% if not is_live %}
+<p class="deploying-note">GitHub Pages is still deploying this page. The link below will work within a minute or so &mdash; if umami.recipes shows an error, wait a few seconds and try again.</p>
+{% endif %}
 
 <a class="import-button" href="{{ umami_import_url }}" target="_blank" rel="noopener">Open in umami.recipes &rarr;</a>
 <p class="relay-link">Relay page: <a href="{{ relay_url }}">{{ relay_url }}</a></p>

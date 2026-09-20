@@ -56,7 +56,7 @@ def do_import():
         )
 
     try:
-        relay_url = publish(recipe)
+        relay_url, recipe, is_live = publish(recipe)
     except PublishError as exc:
         return render_template("index.html", error=f"Couldn't publish the recipe page: {exc}")
 
@@ -67,6 +67,7 @@ def do_import():
         recipe=recipe,
         relay_url=relay_url,
         umami_import_url=umami_import_url,
+        is_live=is_live,
     )
 
 

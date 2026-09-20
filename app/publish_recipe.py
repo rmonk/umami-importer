@@ -17,6 +17,7 @@ import json
 import mimetypes
 import os
 import secrets
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -165,9 +166,27 @@ from anywhere else -- keep this URL to yourself.</p>
 """
 
 
-def publish(recipe: dict) -> str:
-    """Render, publish, and index a normalized recipe dict. Returns its
-    public relay page URL."""
+def _wait_until_live(url: str, timeout: float = 60, interval: float = 2) -> bool:
+    """GitHub Pages takes a while (seconds to ~a minute) to deploy after a
+    commit. Poll until the page is actually reachable so we never hand the
+    user a link that 404s. Returns False (not an error) on timeout -- the
+    page will likely finish deploying moments later regardless."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if requests.head(url, timeout=10, allow_redirects=True).ok:
+                return True
+        except requests.RequestException:
+            pass
+        time.sleep(interval)
+    return False
+
+
+def publish(recipe: dict) -> tuple[str, dict, bool]:
+    """Render, publish, and index a normalized recipe dict. Returns
+    (relay_url, updated_recipe, is_live) -- updated_recipe has image_url
+    rewritten to the re-hosted copy when a photo was published, and is_live
+    is False if the page hadn't finished deploying by the timeout."""
     slug = new_slug()
 
     if recipe.get("image_url"):
@@ -182,4 +201,6 @@ def publish(recipe: dict) -> str:
 
     _update_index(slug, recipe)
 
-    return relay_url
+    is_live = _wait_until_live(relay_url)
+
+    return relay_url, recipe, is_live

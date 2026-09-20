@@ -14,4 +14,4 @@ ENV PATH="/srv/.venv/bin:${PATH}"
 WORKDIR /srv/app
 
 EXPOSE 8000
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8000", "main:app"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8000", "--timeout", "90", "main:app"]
