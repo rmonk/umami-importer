@@ -28,7 +28,7 @@ UMAMI_IMPORT_BASE = "https://www.umami.recipes/import"
 
 def _publish_and_render(recipe: dict):
     try:
-        relay_url, recipe, is_live = publish_recipe.publish(recipe)
+        relay_url, recipe = publish_recipe.publish(recipe)
     except PublishError as exc:
         return render_template("index.html", error=f"Couldn't publish the recipe page: {exc}")
 
@@ -39,7 +39,6 @@ def _publish_and_render(recipe: dict):
         recipe=recipe,
         relay_url=relay_url,
         umami_import_url=umami_import_url,
-        is_live=is_live,
     )
 
 

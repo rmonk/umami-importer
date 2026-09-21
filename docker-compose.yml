@@ -4,22 +4,37 @@ services:
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-      GITHUB_REPO: ${GITHUB_REPO:-rmonk/umami-recipe-relay}
-      GITHUB_PAGES_BASE: ${GITHUB_PAGES_BASE:-https://rmonk.github.io/umami-recipe-relay}
+      RELAY_PUBLIC_BASE: ${RELAY_PUBLIC_BASE:-https://recipes.example.com}
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - relay-data:/srv/relay
     labels:
       tsbridge.enabled: "true"
       tsbridge.service.name: ${TSBRIDGE_SERVICE_NAME:-umami-importer}
       tsbridge.service.port: "8000"
       tsbridge.service.tags: ${TSBRIDGE_SERVICE_TAGS:-}
-      # Publishing a recipe (extraction + image re-host + GitHub commits +
-      # waiting for Pages to deploy) routinely takes 40-90s, well past
-      # tsbridge's 30s default write_timeout -- without this, tsbridge cuts
-      # the connection before the (successfully completing) response comes
-      # back, which looks like an infinite spinner that "eventually" times
-      # out even though the import went through.
-      tsbridge.service.write_timeout: "100s"
+      # Publishing now writes straight to a shared volume (no more GitHub
+      # API calls or Pages deploy-wait), so this matters much less than it
+      # used to -- kept as a safety margin for the LLM-fallback and
+      # headless-browser-fetch paths, which can still occasionally run long.
+      tsbridge.service.write_timeout: "60s"
     restart: unless-stopped
+
+  relay-static:
+    # Very basic static file server for the shared volume, exposed
+    # publicly (umami.recipes' backend fetches these pages over the open
+    # internet -- see README "Deploying via Arcane" for why this can't be
+    # the same Tailscale-only host as umami-recipe-importer). Point your
+    # public hostname (e.g. recipes.example.com) at this container's port.
+    image: nginx:alpine
+    volumes:
+      - relay-data:/usr/share/nginx/html
+      - ./relay-static/nginx.conf:/etc/nginx/conf.d/default.conf:ro,Z
+    ports:
+      - "${RELAY_PORT:-8081}:80"
+    restart: unless-stopped
+
+volumes:
+  relay-data:

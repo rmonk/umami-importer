@@ -18,30 +18,44 @@ malformed structured data.
 
 Rather than reverse-engineer umami's private database writes (see
 "Investigated and not used" below), this tool extracts a recipe robustly
-(schema.org first, Claude fallback for messy HTML or PDF text — see
+(schema.org first, LLM fallback for messy HTML or PDF text — see
 `app/extract_url.py` / `app/extract_pdf.py`), **re-renders it as a clean,
 minimal HTML page carrying complete, well-formed schema.org/JSON-LD**
-(`app/render_recipe_html.py`), publishes that page to a public GitHub Pages
-repo (`app/publish_recipe.py`), and hands the user
+(`app/render_recipe_html.py`), publishes that page somewhere public
+(`app/publish_recipe.py`), and hands the user
 `https://www.umami.recipes/import?url=<relay page>` — the exact same URL
 scheme the extension itself constructs. umami's own importer then does the
 rest, using its own supported, app-store-approved pipeline.
 
-This was verified empirically: a test page with clean JSON-LD published to
-`https://rmonk.github.io/umami-recipe-relay/recipes/test-probe.html` was
-correctly parsed by the real `/api/can-import` endpoint, matching umami's
-internal rich-text schema field-for-field (ingredients/directions as
-paragraph/text nodes, servings, activeTime/totalTime, image). No domain
-allowlist or other restriction was encountered.
+This was verified empirically: a test page with clean JSON-LD was correctly
+parsed by the real `/api/can-import` endpoint, matching umami's internal
+rich-text schema field-for-field (ingredients/directions as paragraph/text
+nodes, servings, activeTime/totalTime, image). No domain allowlist or other
+restriction was encountered — any publicly-reachable URL works.
 
-**Relay repo**: `github.com/rmonk/umami-recipe-relay`, public, GitHub Pages
-serving from `main` branch root at `https://rmonk.github.io/umami-recipe-relay/`.
-Pages are published via the GitHub Contents API (`PUT
-/repos/{repo}/contents/{path}`) with a bearer token in `GITHUB_TOKEN` — not
-git/SSH — so the container doesn't need any git tooling or credentials beyond
-that one token. Recipe pages get a random unlisted slug
-(`recipes/<random-slug>.html`); nothing links to them, so they aren't
-discoverable even though the repo is public.
+**Relay hosting**: a shared Docker volume between the app container and a
+second, plain `nginx:alpine` container (`relay-static` in
+`docker-compose.yml`) that just serves whatever's on it, exposed publicly at
+`RELAY_PUBLIC_BASE`. A file is visible to nginx the instant `publish_recipe.py`
+writes it — no deploy pipeline, no propagation delay. `nginx.conf` adds
+`Access-Control-Allow-Origin: *` to every response (nginx doesn't send one by
+default), which matters for umami's client-side photo preview to load the
+re-hosted image cross-origin. Recipe pages get a random unlisted slug
+(`recipes/<random-slug>.html`); nothing links to them from elsewhere.
+
+*Earlier implementation, replaced*: this originally published to a public
+GitHub Pages repo via the Contents API (`PUT /repos/{repo}/contents/{path}`,
+bearer token, no git/SSH needed). It worked and stayed correctly synced, but
+GitHub Pages runs a full build-and-deploy pipeline on every commit —
+typically 10-60+ seconds before a new page was actually live — which was
+slow enough to occasionally trip a reverse proxy's write timeout in front of
+the app, making a successful publish look to the user like it had hung and
+failed. The Contents API also isn't atomic across concurrent requests (two
+overlapping publishes could 409 on an unrelated file's write, since the
+conflict is a branch-ref race, not a same-file content conflict), which
+needed its own retry logic. The shared-volume approach has neither problem:
+a local filesystem write is immediate and a single `flock` easily keeps
+`manifest.json` updates from racing across gunicorn's worker processes.
 
 ## Investigated and not used: writing directly into umami's Firestore
 
