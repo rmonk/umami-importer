@@ -1,0 +1,251 @@
+/* Shared stylesheet for every page on the relay: individual recipe pages
+   and the manifest index. Linked (not inlined) so updating this one file
+   restyles every already-published recipe page too, not just new ones. */
+
+:root {
+  --paper: #faf6ef;
+  --ink: #2b2620;
+  --accent: #3f5d3a;
+  --accent-soft: #e7ede1;
+  --line: #e3dacb;
+  --muted: #7a6f5d;
+
+  --serif: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1c1a16;
+    --ink: #ede7da;
+    --accent: #8fb37e;
+    --accent-soft: #2a3326;
+    --line: #3a352c;
+    --muted: #a79c88;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+h1,
+h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ---- Recipe page ---- */
+
+.recipe {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.recipe-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.recipe-header img {
+  width: 100%;
+  max-height: 22rem;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  margin-bottom: 1.5rem;
+}
+
+.recipe-header h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  margin: 0 0 1rem;
+}
+
+.recipe-meta {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+}
+
+.recipe-meta div {
+  padding: 0 1.5rem;
+  border-left: 1px solid var(--line);
+}
+
+.recipe-meta div:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.recipe-meta span {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.recipe-meta strong {
+  font-weight: 600;
+}
+
+.recipe-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+
+@media (min-width: 640px) {
+  .recipe-body {
+    grid-template-columns: minmax(180px, 240px) 1fr;
+    align-items: start;
+  }
+}
+
+.recipe h2 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+
+.ingredients ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ingredients li {
+  padding: 0.4rem 0 0.4rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.ingredients li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.95rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.directions ol {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+}
+
+.directions li {
+  counter-increment: step;
+  padding-left: 2.75rem;
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.directions li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -0.05rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.notes ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.source {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* ---- Index page ---- */
+
+.relay-index {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.relay-index h1 {
+  font-size: 1.75rem;
+  margin: 0 0 0.5rem;
+}
+
+.relay-index > p {
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+.relay-index ul {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+}
+
+.relay-index li {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.relay-index li > a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.relay-index li > a:hover {
+  color: var(--accent);
+}
+
+.relay-index .entry-meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}

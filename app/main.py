@@ -25,6 +25,14 @@ app = Flask(__name__)
 
 UMAMI_IMPORT_BASE = "https://www.umami.recipes/import"
 
+# Refresh index.html/index.js/style.css on the volume immediately, so a
+# stylesheet change takes effect for every already-published recipe page on
+# deploy rather than waiting for the next import.
+try:
+    publish_recipe.ensure_static_assets()
+except Exception as exc:
+    print(f"[startup] Refreshing static assets failed: {exc}", flush=True)
+
 # Self-healing pass over whatever's already on the relay volume -- merges
 # any duplicate manifest entries (e.g. from before publish() started
 # deduplicating by source_url) and deletes their redundant files. Runs once

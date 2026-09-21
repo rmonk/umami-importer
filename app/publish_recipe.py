@@ -59,11 +59,13 @@ def _public_base() -> str:
 
 
 def _ensure_static_assets(relay_dir: Path) -> None:
-    """Copies the bundled index.html/index.js (the manifest-browsing UI)
-    onto the shared volume. Safe to call on every publish -- it's just an
-    overwrite, which keeps them in sync with whatever app version is
-    running."""
-    for name in ("index.html", "index.js"):
+    """Copies the bundled index.html/index.js/style.css (the manifest UI and
+    the stylesheet shared with every recipe page) onto the shared volume.
+    Safe to call on every publish -- it's just an overwrite, which keeps
+    them in sync with whatever app version is running, and means updating
+    the stylesheet restyles every already-published recipe page too, not
+    just new ones."""
+    for name in ("index.html", "index.js", "style.css"):
         shutil.copyfile(_STATIC_ASSETS_DIR / name, relay_dir / name)
 
 
@@ -194,6 +196,14 @@ def cleanup_duplicates(relay_dir: Path | None = None) -> int:
             return len(removed)
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def ensure_static_assets() -> None:
+    """Public entry point for refreshing index.html/index.js/style.css on
+    the volume outside of a publish -- called at app startup so a style
+    change takes effect for every already-published recipe page immediately
+    on deploy, not just the next time someone imports something."""
+    _ensure_static_assets(_relay_dir())
 
 
 def publish(recipe: dict) -> tuple[str, dict]:

@@ -12,21 +12,25 @@ fetch("manifest.json")
 
     for (const entry of entries) {
       const li = document.createElement("li");
-      const date = (entry.published_at || "").slice(0, 10);
 
       const recipeLink = document.createElement("a");
       recipeLink.href = `recipes/${entry.slug}.html`;
       recipeLink.textContent = entry.name || "Untitled recipe";
+      li.appendChild(recipeLink);
 
-      li.append(`${date} — `, recipeLink);
+      const meta = document.createElement("span");
+      meta.className = "entry-meta";
+      meta.textContent = (entry.published_at || "").slice(0, 10);
 
       if (entry.source_url) {
+        meta.append(" · ");
         const sourceLink = document.createElement("a");
         sourceLink.href = entry.source_url;
         sourceLink.textContent = "source";
-        li.append(" · ", sourceLink);
+        meta.appendChild(sourceLink);
       }
 
+      li.appendChild(meta);
       list.appendChild(li);
     }
   })
