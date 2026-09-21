@@ -26,7 +26,10 @@ import requests
 from render_recipe_html import render_recipe_html
 
 DEFAULT_RELAY_DIR = "/srv/relay"
-DEFAULT_PUBLIC_BASE = "https://recipes.example.com"
+# Only a fallback for ad-hoc local testing without the relay-static
+# container (see README "Run locally") -- real deployments must set
+# RELAY_PUBLIC_BASE explicitly; docker-compose.yml requires it outright.
+DEFAULT_PUBLIC_BASE = "http://localhost:8081"
 MANIFEST_NAME = "manifest.json"
 
 _STATIC_ASSETS_DIR = Path(__file__).resolve().parent / "relay_static"

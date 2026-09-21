@@ -4,7 +4,7 @@ services:
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
-      RELAY_PUBLIC_BASE: ${RELAY_PUBLIC_BASE:-https://recipes.example.com}
+      RELAY_PUBLIC_BASE: ${RELAY_PUBLIC_BASE:?set this to relay-static's public URL, e.g. https://recipes.example.com}
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
