@@ -25,6 +25,21 @@ app = Flask(__name__)
 
 UMAMI_IMPORT_BASE = "https://www.umami.recipes/import"
 
+# Self-healing pass over whatever's already on the relay volume -- merges
+# any duplicate manifest entries (e.g. from before publish() started
+# deduplicating by source_url) and deletes their redundant files. Runs once
+# per worker process at startup; safe under gunicorn's multiple workers
+# since it's file-locked and a no-op once nothing's left to merge.
+try:
+    _removed = publish_recipe.cleanup_duplicates()
+    if _removed:
+        # print, not app.logger: Flask's logger isn't wired to gunicorn's
+        # stdout/stderr by default, so app.logger.info() here would silently
+        # never show up in `docker logs`.
+        print(f"[startup] Removed {_removed} duplicate recipe(s) from the relay", flush=True)
+except Exception as exc:
+    print(f"[startup] Duplicate cleanup failed: {exc}", flush=True)
+
 
 def _publish_and_render(recipe: dict):
     try:

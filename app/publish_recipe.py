@@ -8,6 +8,15 @@ recipe's "view source" link in umami should keep working. manifest.json (fed
 to the static index.html/index.js bundled in relay_static/, copied onto the
 volume once per publish) gives an easy, stable (but unlisted -- not linked
 from any individual recipe page) way to find everything published.
+
+Duplicates (the same source_url published more than once -- e.g. a client
+retrying a request that had actually already succeeded) are handled two
+ways: publish() reuses the existing slug for a source_url it's already seen,
+overwriting that recipe's page in place rather than creating a second one;
+cleanup_duplicates() is a self-healing pass (run once at app startup) that
+merges any duplicate manifest entries and deletes their now-redundant files,
+in case any slipped through before this existed, or some other path ever
+reintroduces one.
 """
 
 from __future__ import annotations
@@ -81,11 +90,38 @@ def _rehost_image(image_url: str, slug: str, relay_dir: Path) -> str | None:
         return None
 
 
-def _update_manifest(slug: str, recipe: dict, relay_dir: Path) -> None:
+def _find_duplicate_slug(source_url: str, relay_dir: Path) -> str | None:
+    """The slug of an already-published recipe with this source_url, if
+    any -- so publish() can overwrite it in place instead of creating a
+    second copy. Best-effort: a read failure just means no duplicate is
+    detected, same as if there genuinely wasn't one."""
+    manifest_path = relay_dir / MANIFEST_NAME
+    if not manifest_path.exists():
+        return None
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_SH)
+            try:
+                raw = f.read()
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+        entries = json.loads(raw) if raw.strip() else []
+    except Exception:
+        return None
+
+    matches = [e for e in entries if e.get("source_url") == source_url and e.get("slug")]
+    if not matches:
+        return None
+    return max(matches, key=lambda e: e.get("published_at", ""))["slug"]
+
+
+def _upsert_manifest(slug: str, recipe: dict, relay_dir: Path) -> None:
     """File-locked read-modify-write -- local disk, so a lock is cheap, and
     avoids losing an entry when two publishes land concurrently (gunicorn
-    runs multiple workers). Best-effort: never raises, since the recipe page
-    itself is already published and working even if this fails."""
+    runs multiple workers). Replaces the entry for `slug` if one already
+    exists (re-publishing an already-seen source_url), otherwise appends.
+    Best-effort: never raises, since the recipe page itself is already
+    published and working even if this fails."""
     try:
         manifest_path = relay_dir / MANIFEST_NAME
         manifest_path.touch(exist_ok=True)
@@ -94,6 +130,7 @@ def _update_manifest(slug: str, recipe: dict, relay_dir: Path) -> None:
             try:
                 raw = f.read()
                 entries = json.loads(raw) if raw.strip() else []
+                entries = [e for e in entries if e.get("slug") != slug]
                 entries.append(
                     {
                         "slug": slug,
@@ -111,13 +148,68 @@ def _update_manifest(slug: str, recipe: dict, relay_dir: Path) -> None:
         pass
 
 
+def cleanup_duplicates(relay_dir: Path | None = None) -> int:
+    """Keeps only the most-recently-published manifest entry per
+    source_url, deleting the redundant recipe/photo files. Meant to be
+    called once at app startup as a self-healing pass over whatever's
+    already on the volume; safe to call repeatedly -- a no-op once nothing's
+    left to merge. Returns how many duplicate entries were removed."""
+    relay_dir = relay_dir or _relay_dir()
+    manifest_path = relay_dir / MANIFEST_NAME
+    if not manifest_path.exists():
+        return 0
+
+    manifest_path.touch(exist_ok=True)
+    with open(manifest_path, "r+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            raw = f.read()
+            entries = json.loads(raw) if raw.strip() else []
+
+            best_by_source: dict[str, dict] = {}
+            keep: list[dict] = []
+            for entry in entries:
+                source_url = entry.get("source_url")
+                if not source_url:
+                    keep.append(entry)
+                    continue
+                current = best_by_source.get(source_url)
+                if current is None or entry.get("published_at", "") > current.get("published_at", ""):
+                    best_by_source[source_url] = entry
+            keep.extend(best_by_source.values())
+
+            keep_slugs = {e.get("slug") for e in keep}
+            removed = [e for e in entries if e.get("slug") not in keep_slugs]
+
+            if removed:
+                for entry in removed:
+                    slug = entry.get("slug")
+                    if slug:
+                        for path in (relay_dir / "recipes").glob(f"{slug}.*"):
+                            path.unlink(missing_ok=True)
+                f.seek(0)
+                f.truncate()
+                json.dump(keep, f, indent=2)
+
+            return len(removed)
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def publish(recipe: dict) -> tuple[str, dict]:
     """Render and publish a normalized recipe dict to the shared volume.
     Returns (relay_url, updated_recipe) -- updated_recipe has image_url
-    rewritten to the re-hosted copy when a photo was published."""
+    rewritten to the re-hosted copy when a photo was published.
+
+    Re-publishing a source_url that's already been published overwrites
+    that recipe's existing page/photo in place (same slug, same URL) rather
+    than creating a new one, so a client retrying a request -- even many
+    times -- can't pile up duplicates."""
     relay_dir = _relay_dir()
     _ensure_static_assets(relay_dir)
-    slug = new_slug()
+
+    source_url = recipe.get("source_url")
+    slug = (_find_duplicate_slug(source_url, relay_dir) if source_url else None) or new_slug()
 
     if recipe.get("image_url"):
         hosted = _rehost_image(recipe["image_url"], slug, relay_dir)
@@ -133,6 +225,6 @@ def publish(recipe: dict) -> tuple[str, dict]:
 
     relay_url = f"{_public_base()}/recipes/{slug}.html"
 
-    _update_manifest(slug, recipe, relay_dir)
+    _upsert_manifest(slug, recipe, relay_dir)
 
     return relay_url, recipe
