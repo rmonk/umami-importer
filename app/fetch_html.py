@@ -6,7 +6,7 @@ Reddit). Plain requests is tried first since it's much faster/cheaper."""
 from __future__ import annotations
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, UnicodeDammit
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -65,11 +65,25 @@ def _fetch_with_browser(url: str) -> str:
             browser.close()
 
 
+def _decode(resp: requests.Response) -> str:
+    """resp.text, except when the Content-Type header declares no charset:
+    requests then falls back to ISO-8859-1 (per the old HTTP spec), which
+    turns UTF-8 pages into mojibake ("½" -> "Â½"). In that case
+    let UnicodeDammit pick the encoding from the page's own <meta charset>
+    (or by sniffing the bytes) instead."""
+    if "charset" in resp.headers.get("Content-Type", "").lower():
+        return resp.text
+    decoded = UnicodeDammit(resp.content, is_html=True).unicode_markup
+    return decoded if decoded is not None else resp.text
+
+
 def fetch_html(url: str) -> str:
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=20)
-        if resp.ok and _looks_like_real_page(resp.text):
-            return resp.text
+        if resp.ok:
+            html = _decode(resp)
+            if _looks_like_real_page(html):
+                return html
     except requests.RequestException:
         pass
 
