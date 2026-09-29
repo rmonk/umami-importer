@@ -95,7 +95,9 @@ def render_recipe_html(recipe: dict) -> str:
     )
     image_html = f'<img src="{_esc(image_url)}" alt="{_esc(name)}">' if image_url else ""
     source_html = (
-        f'<p class="source"><a href="{_esc(source_url)}">Original source</a></p>' if source_url else ""
+        f'<p class="source">Original source: <a href="{_esc(source_url)}">{_esc(source_url)}</a></p>'
+        if source_url
+        else ""
     )
 
     return f"""<!doctype html>
