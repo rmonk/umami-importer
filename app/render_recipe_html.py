@@ -40,6 +40,10 @@ def _esc(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+def _ascii_only(text: str) -> str:
+    return text.encode("ascii", "xmlcharrefreplace").decode("ascii")
+
+
 def _meta_item(label: str, value: str) -> str:
     return f"<div><span>{_esc(label)}</span><strong>{_esc(value)}</strong></div>"
 
@@ -100,7 +104,12 @@ def render_recipe_html(recipe: dict) -> str:
         else ""
     )
 
-    return f"""<!doctype html>
+    # Encoded as pure ASCII -- non-ASCII characters become \\uXXXX escapes in
+    # the JSON-LD (via json.dumps' default ensure_ascii) and &#NNN; character
+    # references everywhere else (via _ascii_only) -- so the page imports
+    # correctly even if a consumer ignores the declared charset and guesses
+    # wrong, which umami.recipes' importer has been seen to do.
+    return _ascii_only(f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -110,7 +119,7 @@ def render_recipe_html(recipe: dict) -> str:
 {f'<meta property="og:image" content="{_esc(image_url)}">' if image_url else ""}
 <meta property="og:title" content="{_esc(name)}">
 <script type="application/ld+json">
-{json.dumps(json_ld, ensure_ascii=False, indent=2)}
+{json.dumps(json_ld, indent=2)}
 </script>
 </head>
 <body>
@@ -143,4 +152,4 @@ def render_recipe_html(recipe: dict) -> str:
 </article>
 </body>
 </html>
-"""
+""")
