@@ -198,6 +198,7 @@ h2 {
   margin-top: 2rem;
   font-size: 0.9rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 /* ---- Index page ---- */
