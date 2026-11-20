@@ -44,6 +44,12 @@ them with a plain server-side HTTP request that never runs JavaScript, so
 each recipe's schema.org/JSON-LD has to be present in the HTML bytes nginx
 serves, not injected afterward.
 
+The app container runs as an unprivileged user (uid/gid 10001), so the volume
+must be writable by it. A new `relay-data` volume starts out owned by that
+user. A volume created by an older image (which ran as root) needs a one-time
+`chown -R 10001:10001` of the volume's directory on the host before the new
+image can publish.
+
 `relay-static` needs to be reachable from the public internet (umami's
 backend fetches from there), which the app container itself isn't — it's
 only exposed over Tailscale via tsbridge. Point a real public hostname
